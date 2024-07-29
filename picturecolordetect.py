@@ -1,67 +1,52 @@
 
-
 import cv2
 import pandas as pd
-
 import tkinter as tk
 from tkinter import filedialog
-def open_image():
 
-    filepath = filedialog.askopenfilename(
+def select_image():
+    file_path = filedialog.askopenfilename(
         initialdir="This PC",
-        title="Select an image",
+        title="Choose an image",
         filetypes=(
             ("Image files", "*.png *.gif *.jpg *.jpeg *.pgm *.ppm *.xbm"),
             ("All files", "*.*")
         )
     )
-    return filepath
+    return file_path
 
-photo = open_image()
-img = cv2.imread(photo)
+selected_image = select_image()
+image = cv2.imread(selected_image)
 
-# declaring global variables (are used later on)
-clicked = False
-r = g = b = x_pos = y_pos = 0
+mouse_clicked = False
+red = green = blue = x_coord = y_coord = 0
 
-# Reading csv file with pandas and giving names to each column
-index = ["color", "color_name", "hex", "R", "G", "B"]
-csv = pd.read_csv('colors.csv', names=index, header=None)
-csv.head()
-def checkColor(R, G, B):
-    minimum = 10000
-    for i in range(len(csv)):
-        d = abs(R - int(csv.loc[i, "R"])) + abs(G - int(csv.loc[i, "G"])) + abs(B - int(csv.loc[i, "B"]))
-        if d <= minimum:
-            minimum = d
-            cname = csv.loc[i, "color_name"]
-    return cname
+color_columns = ["color", "color_name", "hex", "R", "G", "B"]
+color_data = pd.read_csv('colors.csv', names=color_columns, header=None)
 
-# function to get x,y coordinates of mouse double click
-def draw_function(event, x, y, flags, param):
+def identify_color(red, green, blue):
+    color_diffs = color_data.apply(lambda row: abs(red - row["R"]) + abs(green - row["G"]) + abs(blue - row["B"]),axis=1)
+    closest_color_idx = color_diffs.idxmin()
+    return color_data.loc[closest_color_idx, "color_name"]
+
+def handle_mouse_event(event, x, y, flags, param):
+    global blue, green, red, x_coord, y_coord, mouse_clicked
     if event == cv2.EVENT_LBUTTONDBLCLK:
-        global b, g, r, x_pos, y_pos, clicked
-        clicked = True
-        x_pos = x
-        y_pos = y
-        b, g, r = img[y, x]
-        b = int(b)
-        g = int(g)
-        r = int(r)
+        mouse_clicked = True
+        x_coord, y_coord = x, y
+        blue, green, red = map(int, image[y, x])
+
 cv2.namedWindow('image')
-cv2.setMouseCallback('image', draw_function)
+cv2.setMouseCallback('image', handle_mouse_event)
 
 while True:
-
-    cv2.imshow("image", img)
-    if clicked:
-        cv2.rectangle(img, (20, 20), (750, 60), (b, g, r), -1)
-        text = checkColor(r, g, b) + ' R=' + str(r) + ' G=' + str(g) + ' B=' + str(b)
-        cv2.putText(img, text, (50, 50), 2, 0.8, (255, 255, 255), 1, cv2.FONT_HERSHEY_COMPLEX)
-        if r + g + b >= 600:
-            cv2.putText(img, text, (50, 50), 2, 0.8, (0, 0, 0), 1, cv2.FONT_HERSHEY_COMPLEX)
-        clicked = False
-# Press Esc key to exist
+    cv2.imshow("image", image)
+    if mouse_clicked:
+        cv2.rectangle(image, (20, 20), (750, 60), (blue, green, red), -1)
+        color_text = identify_color(red, green, blue) + ' R=' + str(red) + ' G=' + str(green) + ' B=' + str(blue)
+        text_color = (0, 0, 0) if red + green + blue >= 600 else (255, 255, 255)
+        cv2.putText(image, color_text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color, 1)
+        mouse_clicked = False
     if cv2.waitKey(20) & 0xFF == 27:
         break
 
